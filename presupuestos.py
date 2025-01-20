@@ -231,7 +231,7 @@ class MainWindow(QMainWindow):
         self.tableWidget_detalles.setRowCount(0)
         self.tableWidget_montos.setRowCount(0)
         self.lineEdit_total.clear()
-
+        self.lineEdit_total.setPlaceholderText('')
 
     def guardar(self):
         """
