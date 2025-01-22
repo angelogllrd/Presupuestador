@@ -310,6 +310,9 @@
                <pointsize>11</pointsize>
               </font>
              </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::AllEditTriggers</set>
+             </property>
              <property name="selectionMode">
               <enum>QAbstractItemView::SingleSelection</enum>
              </property>
@@ -417,6 +420,9 @@
                <family>Segoe UI</family>
                <pointsize>11</pointsize>
               </font>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::AllEditTriggers</set>
              </property>
              <property name="selectionMode">
               <enum>QAbstractItemView::SingleSelection</enum>

@@ -18,39 +18,6 @@ import re
 
 
 
-
-class CustomLineEdit(QLineEdit):
-    """ """
-
-    def __init__(self):
-        super().__init__()
-
-        self.textEdited.connect(self.formatearMonto)
-
-
-    def formatearMonto(self, texto):
-        """Coloca puntos al monto cada tres dígitos."""
-
-        print(texto)
-        # dni = self.lineEdit_dni.text()
-
-        # # Si no hay al menos 4 dígitos, no formateo
-        # if not len(dni) > 3:
-        #     return
-
-        # # Formateo DNI con puntos cada tres dígitos
-        # dniFormateado = ''
-        # while len(dni) > 3:
-        #     dniFormateado = '.' + dni[-3:] + dniFormateado
-        #     dni = dni[:-3]
-        # dniFormateado = dni + dniFormateado
-
-        # # Actualizo texto en QLineEdit de dni
-        # self.lineEdit_dni.setText(dniFormateado)
-
-
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -66,7 +33,7 @@ class MainWindow(QMainWindow):
         # Carpeta de guardado de presupuestos
         self.pdfFolder = 'D:\\Google Drive'
 
-        # Configuro acciones disparadas por QPushButtons
+        # Configuro acciones disparadas por QPushButton
         self.pushButton_adddetalle.clicked.connect(self.agregarDetalle)
         self.pushButton_deldetalle.clicked.connect(self.eliminarDetalle)
         self.pushButton_addmonto.clicked.connect(self.agregarMonto)
@@ -74,12 +41,12 @@ class MainWindow(QMainWindow):
         self.pushButton_vaciar.clicked.connect(self.vaciar)
         self.pushButton_guardar.clicked.connect(self.guardar)
 
+        # Configuro acciones disparadas por QLineEdit
         self.lineEdit_total.textChanged.connect(self.formatearMonto)
 
-        self.tableWidget_detalles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.tableWidget_montos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-
+        # Configuro acciones disparadas por QTableWidget
+        self.tableWidget_detalles.cellChanged.connect(self.celdaCambiada) # Señal que se emite cada vez que cambia el contenido de una celda
+        self.tableWidget_montos.cellChanged.connect(self.celdaCambiada)
 
         # Cargo ítems en el ComboBox de clientes
         self.cargarClientes()
@@ -87,38 +54,69 @@ class MainWindow(QMainWindow):
         # Pongo fecha actual
         self.ponerFechaActual()
 
+        # Ajusto el ancho de las columnas de ambas tablas equitativamente
+        self.repartirColumnas()
+
+
+    def celdaCambiada(self, row, column):
+        """Ajusta el alto de las filas al contenido para que todo el texto sea visible."""
+
+        # Detecto cuál table widget lo llamó
+        sender = self.sender()
+
+        # Ajusto el alto de las filas al contenido
+        sender.resizeRowsToContents()
+
+        # Evito que resizeRowsToContents() me achique la fila más que el alto original
+        for fila in range(sender.rowCount()):
+            if sender.rowHeight(fila) < 30: # 30 es el alto original
+                sender.setRowHeight(fila, 30)
+
 
     def cargarClientes(self):
+        """Carga los clientes desde el .txt y los pone en el combo box."""
+
         # Creo la lista de clientes para agregar
         self.clientes = []
         with open('clientes.txt', 'r') as archivo:
             for linea in archivo:
                 self.clientes.append(linea.strip())
-            self.clientes.sort()
+        
+        # Ordeno los clientes
+        self.clientes.sort()
 
-        self.comboBox_clientes.addItems(self.clientes) # Agrego todos los ítems de la lista
+        # Agrego todos los ítems de la lista
+        self.comboBox_clientes.addItems(self.clientes)
 
-        # Establecer sin selección inicial
+        # Establezco que no haya uno seleccionado
         self.comboBox_clientes.setCurrentIndex(-1)
-
-        # print(f'"{self.comboBox_clientes.currentText()}"')
 
 
     def ponerFechaActual(self):
+        """Pone la fecha actual en el QDateEdit."""
+
         self.dateEdit_fecha.setDate(QDate.currentDate())
+
+
+    def repartirColumnas(self):
+        """Ajusta el ancho de las columnas de ambas tablas equitativamente."""
+
+        self.tableWidget_detalles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tableWidget_montos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
 
     def agregarDetalle(self):
         """Agrega una fila al final de la tabla de detalles."""
 
+        # Inserto una fila al final
         nroFilas = self.tableWidget_detalles.rowCount()
-        self.tableWidget_detalles.insertRow(nroFilas)  # Inserta una fila al final
+        self.tableWidget_detalles.insertRow(nroFilas)
 
 
     def eliminarDetalle(self):
-        """Elimina la fila seleccionada."""
-        
-        filaActual = self.tableWidget_detalles.currentRow() # Obtiene la fila seleccionada
+        """Elimina la fila seleccionada de la tabla de detalles."""
+
+        filaActual = self.tableWidget_detalles.currentRow() # Obtengo la fila seleccionada
         if filaActual != -1: # Me aseguro de que haya una fila seleccionada
             self.tableWidget_detalles.removeRow(filaActual)
 
@@ -130,16 +128,16 @@ class MainWindow(QMainWindow):
         nroFilas = self.tableWidget_montos.rowCount()
         self.tableWidget_montos.insertRow(nroFilas)
 
-        # Hago que aparezca el total si hay una fila
+        # Hago que aparezca el placeholder text del total si hay una fila
         if self.tableWidget_montos.rowCount() == 1:
             self.lineEdit_total.setPlaceholderText('$ 0')
-            
-        # Inserto el QLineEdit del monto en la  celda
+
+        # Inserto el QLineEdit del monto en la celda del monto
         lineEdit = QLineEdit()
         lineEdit.setPlaceholderText('$ 0')
         lineEdit.setAlignment(Qt.AlignRight)
         self.tableWidget_montos.setCellWidget(nroFilas, 1, lineEdit)
-        
+
         # Conecto señales al QLineEdit
         lineEdit.textEdited.connect(self.formatearMonto)
         lineEdit.textEdited.connect(self.actualizarTotal)
@@ -147,7 +145,7 @@ class MainWindow(QMainWindow):
 
     def limpiarMonto(self, stringMonto):
         """Quita de un string de monto cualquier caracter que no sea un dígito."""
-        
+
         return re.sub(
             r'\D',          # Regex (match donde el string NO contiene dígitos)
             '',             # Por lo que quiero reemplazar
@@ -158,21 +156,22 @@ class MainWindow(QMainWindow):
     def formatearMonto(self, texto):
         """Coloca puntos cada tres dígitos al monto."""
 
+        # Obtengo el line edit que llamó al método
         sender = self.sender()
 
         # Quito cualquier caracter que no sea un dígito
         monto = self.limpiarMonto(sender.text())
 
-        # Quito ceros al principio
+        # Quito posibles ceros al principio
         if len(monto):
             monto = str(int(monto))
         
         # Si no hay al menos 4 dígitos, no formateo
         if not len(monto) > 3:
-            if not len(monto) or monto == '0':
-                sender.clear()
+            if not len(monto) or monto == '0': # Hago clear() para mostrar el placeholder text cuando: borré y quedó sin monto (para evitar que
+                sender.clear()                 # quede "$" solo) y cuando pongo un 0 (no suma al total y ya está en el placeholder text)
             else:
-                sender.setText(f'$ {monto}')
+                sender.setText(f'$ {monto}') # Si tengo un monto válido con 1 a 3 dígitos, le pongo el "$""
             return
 
         # Formateo el monto con puntos cada tres dígitos
@@ -198,13 +197,13 @@ class MainWindow(QMainWindow):
 
             if stringMonto: # Verifico que tenga un monto (porque si está el placeholder text hay un string vacio)
                 monto = int(stringMonto)
-                
+
                 # Determino el valor actual de Total
                 if self.lineEdit_total.text():
                     total = int(self.limpiarMonto(self.lineEdit_total.text()))
                 else:
                     total = 0
-            
+
                 # Actualizo Total
                 self.lineEdit_total.setText(f'$ {str(total + monto)}')
 
@@ -212,7 +211,7 @@ class MainWindow(QMainWindow):
     def eliminarMonto(self):
         """Elimina la fila seleccionada de la tabla de montos."""
 
-        filaActual = self.tableWidget_montos.currentRow() # Obtiene la fila seleccionada
+        filaActual = self.tableWidget_montos.currentRow()
         if filaActual != -1: # Me aseguro de que haya una fila seleccionada
             self.tableWidget_montos.removeRow(filaActual)
 
@@ -225,6 +224,8 @@ class MainWindow(QMainWindow):
 
 
     def vaciar(self):
+        """Deja todo como al abrir el programa."""
+
         self.cargarClientes()
         self.ponerFechaActual()
         self.lineEdit_titulo.clear()
@@ -233,13 +234,43 @@ class MainWindow(QMainWindow):
         self.lineEdit_total.clear()
         self.lineEdit_total.setPlaceholderText('')
 
+
     def guardar(self):
         """
-        Agrega el cliente si no estaba en la lista, reúne los datos para armar el PDF,
-        y genera el cuadro de diálogo para guardar el PDF.
+        * Verifica si se completó lo necesario y de lo contrario lo informa.
+        * Agrega el cliente presente en el combo box si no estaba en la lista.
+        * Reúne los datos para armar el PDF.
+        * Genera el cuadro de diálogo para guardar el PDF.
         """
 
-        # Verifico si el cliente actual existe
+        # Verifico que se haya completado lo necesario
+        mensaje = ''
+        hayProblemas = False
+        cantProblemas = 0
+        if not self.comboBox_clientes.currentText().strip():
+            mensaje += '- Falta <b>Cliente</b><br>'
+            hayProblemas = True
+            cantProblemas += 1
+        if not self.lineEdit_titulo.text().strip():
+            mensaje += '- Falta <b>Título del trabajo</b><br>'
+            hayProblemas = True
+            cantProblemas += 1
+        if not self.radioButton_siniva.isChecked() and not self.radioButton_coniva.isChecked():
+            mensaje += '- Falta seleccionar <b>IVA</b><br>'
+            hayProblemas = True
+            cantProblemas += 1
+        if not self.lineEdit_total.text():
+            mensaje += '- No hay montos en la tabla <b>Montos</b><br>'
+            hayProblemas = True
+            cantProblemas += 1
+
+        # Muestro el QMessageBox si hay problemas
+        if hayProblemas:
+            mensaje = f"PROBLEMA{'S' if cantProblemas > 1 else ''}:<br>" + mensaje
+            self.mostrarAdvertencia('Advertencia', mensaje)
+            return
+
+        # Verifico si el cliente actual existe, y sino lo agrego a clientex.txt
         clienteActual = self.comboBox_clientes.currentText()
         if clienteActual not in self.clientes:
             with open('clientes.txt', 'a') as archivo:
@@ -249,16 +280,18 @@ class MainWindow(QMainWindow):
         listaDetalles = []
         for fila in range(self.tableWidget_detalles.rowCount()):
             item = self.tableWidget_detalles.item(fila, 0)
-            listaDetalles.append(item.text() if item else '-')
+            if item and item.text().strip():
+                listaDetalles.append(item.text().capitalize())
 
         # Obtengo una lista de los montos
         listaMontos = []
         for fila in range(self.tableWidget_montos.rowCount()):
             item = self.tableWidget_montos.item(fila, 0)
             monto = self.tableWidget_montos.cellWidget(fila, 1).text()
-            listaMontos.append((item.text() if item else '-', monto))
+            if monto: # Solo considero válida la fila si hay un monto
+                listaMontos.append((item.text().capitalize() if item and item.text().strip() else '-', monto))
 
-        # Armo un dicccionario para reunir la información que irá en el PDF
+        # Armo un dicccionario con la información que irá en el PDF
         datos = {
             'cliente': self.comboBox_clientes.currentText(),
             'fecha': self.dateEdit_fecha.date().toString('yyyy-MM-dd'),
@@ -297,7 +330,7 @@ class MainWindow(QMainWindow):
             try:
                 # Genero el PDF en la ubicación seleccionada
                 self.crearPdf(datos, filePath)
-                
+
                 # Muestro un mensaje de éxito
                 self.mostrarMensajeGuardado(filePath)
 
@@ -306,6 +339,24 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 # Muestro mensaje de error en caso de fallo
                 QMessageBox.critical(self, 'Error', f'No se pudo generar el PDF:\n{str(e)}')
+
+
+    def mostrarAdvertencia(self, titulo, mensaje):
+        """Muestra un cuadro de diálogo de advertencia con el título y mensaje especificados."""
+
+        msgBox = QMessageBox(self)
+        msgBox.setIcon(QMessageBox.Warning)
+        msgBox.setWindowTitle(titulo)
+        msgBox.setTextFormat(Qt.RichText) # Permite interpretar HTML (para que sea visible la negrita)
+        msgBox.setText(mensaje)
+        msgBox.setStandardButtons(QMessageBox.Ok)
+
+        # Accedo al botón OK y establezco el cursor de mano
+        botonOk = msgBox.button(QMessageBox.Ok)
+        botonOk.setCursor(Qt.PointingHandCursor)
+
+        # Muestro el mensaje
+        msgBox.exec_()
 
 
     def mostrarMensajeGuardado(self, filePath):
@@ -337,10 +388,8 @@ class MainWindow(QMainWindow):
 
 
     def crearPdf(self, datos, filePath):
-        """
-        Construye el PDF del presupuesto y lo guarda en la ruta que le pasamos.
-        """
-        print(filePath)
+        """Construye el PDF del presupuesto y lo guarda en la ruta que le pasamos."""
+
         # Defino tamaños de fuente
         tamañoFuenteMontos = 11
 
@@ -363,6 +412,15 @@ class MainWindow(QMainWindow):
             parent=styles['Heading2'],
             textColor='#0d0d0d', 
             spaceAfter=10
+        )
+
+        heading_normal = ParagraphStyle(
+            'HeadingNormal',
+            parent=styles['Heading1'],  # Basado en el estilo Heading1
+            fontName='Helvetica',      # Cambia a una fuente normal
+            fontSize=16,               # Tamaño del texto
+            leading=20,                # Espaciado entre líneas
+            spaceAfter=12              # Espacio después del heading
         )
 
         textStyle = ParagraphStyle(
@@ -388,15 +446,18 @@ class MainWindow(QMainWindow):
 
         )
 
-        # partesPdf.append(Paragraph("Ancho disponible en linea (pt): 495.27559055118115 Ancho disponible en linea (pt): 495.27559055118115 Ancho disponible en linea (pt): 495.27559055118115", styles["BodyText"]))
-
         # ------------------------------------------ CLIENTE, FECHA, TITULO --------------------------------------
         
         # Cliente
-        partesPdf.append(Paragraph(datos['cliente'], styles['Heading2']))
+        partesPdf.append(Paragraph(f"<b>Cliente:</b> {datos['cliente']}", heading_normal))
         
-        # Título y fecha
-        partesPdf.append(Paragraph(f"{datos['titulo']} ({datos['fecha']})", styles['Heading2']))
+        # Título
+        partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", heading_normal))
+
+        # Fecha
+        fechaQdate = QDate.fromString(datos['fecha'], 'yyyy-MM-dd') # Convierto el string a un objeto QDate
+        fechaConvertida = fechaQdate.toString('dd-MM-yyyy')
+        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", heading_normal))
 
         # Añado espacio entre secciones
         partesPdf.append(Spacer(1, 25))
@@ -459,7 +520,7 @@ class MainWindow(QMainWindow):
         # Añado espacio entre secciones
         partesPdf.append(Spacer(1, 25))
 
-        # -------------------------------------------- TOTAL A TEXTO ---------------------------------------------
+        # -------------------------------------------- TOTAL COMO TEXTO ---------------------------------------------
 
         # Convierto el total a entero
         montoEntero = int(re.sub(r'\D', '', datos['total']))
@@ -467,14 +528,11 @@ class MainWindow(QMainWindow):
         # Convierto el entero a texto
         montoComoTexto = num2words(montoEntero, lang='es').capitalize()
 
-        partesPdf.append(Paragraph(f"<b>Son pesos:</b> {montoComoTexto} ({datos['iva']} incluido)", textStyle))
+        partesPdf.append(Paragraph(f"<b>Son pesos:</b> {montoComoTexto} ({datos['iva']} incluido).", textStyle))
 
 
         # Genero el PDF
         doc.build(partesPdf)
-
-
-
 
 
 
