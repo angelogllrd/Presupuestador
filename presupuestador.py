@@ -553,8 +553,8 @@ class MainWindow(QMainWindow):
             parent=styles['Heading2'],
             backColor=colors.gainsboro,
             textColor='#1a1a1a',
-            borderWidth=0.5,
-            borderColor='#1a1a1a',
+            # borderWidth=0.5,
+            # borderColor='#1a1a1a',
             borderPadding=2,
             spaceAfter=12 # Espacio después del párrafo
         )
@@ -604,19 +604,20 @@ class MainWindow(QMainWindow):
 
         # ---------------------------------------------- DETALLES ------------------------------------------------
 
-        partesPdf.append(Paragraph('Detalles del trabajo', estiloSecciones))
+        if datos['detalles']: 
+            partesPdf.append(Paragraph('Detalles del trabajo', estiloSecciones))
 
-        # Convierto los detalles en un ListFlowable con viñetas
-        bulletList = ListFlowable(
-            [ListItem(Paragraph(detalle, bulletStyle)) for detalle in datos['detalles']],
-            bulletType='bullet' # Opción para viñetas (puedo usar "1" para numeración)
-        )
+            # Convierto los detalles en un ListFlowable con viñetas
+            bulletList = ListFlowable(
+                [ListItem(Paragraph(detalle, bulletStyle)) for detalle in datos['detalles']],
+                bulletType='bullet' # Opción para viñetas (puedo usar "1" para numeración)
+            )
 
-        # Agrego la lista al documento
-        partesPdf.append(bulletList)
+            # Agrego la lista al documento
+            partesPdf.append(bulletList)
 
-        # Añado espacio entre secciones
-        partesPdf.append(Spacer(1, 25))
+            # Añado espacio entre secciones
+            partesPdf.append(Spacer(1, 25))
 
         # ----------------------------------------------- MONTOS -------------------------------------------------
 
