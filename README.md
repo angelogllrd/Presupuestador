@@ -1,6 +1,6 @@
 # Presupuestador
 
-Se trata de una aplicación que permite rellenar información y formatearla para generar un presupuesto en formato PDF. Algunas de sus funciones destacadas son:
+Aplicación para rellenar información de presupuestos, y generar automáticamente PDFs con un formato estándar. Algunas de sus funciones destacadas son:
 - 🧑`Historial de clientes` Si se ingresa un cliente que no está en la lista, el mismo se agregará al historial al guardar el PDF.
 - 🔍`Detalles del trabajo` Una sección para ingresar detalles del trabajo en forma de ítems, con ajuste automático de líneas largas.
 - 💲`Montos detallados` Una sección para ingresar el detalle de los montos. A medida que se ingresan, los mismos se van totalizando y se formatean para facilitar su lectura.
