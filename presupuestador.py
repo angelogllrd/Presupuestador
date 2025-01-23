@@ -1,11 +1,29 @@
-from PyQt5.QtWidgets import QMainWindow, QApplication, QLineEdit, QHeaderView, QFileDialog, QMessageBox
-from PyQt5.QtCore import Qt, QDate, QRegExp
-from PyQt5.QtGui import QRegExpValidator
+#######################################################################################################
+#                                                                                                     #
+#  ____   ____     ___   _____ __ __  ____   __ __    ___   _____ ______   ____  ___     ___   ____   #
+# |    \ |    \   /  _] / ___/|  T  T|    \ |  T  T  /  _] / ___/|      T /    T|   \   /   \ |    \  #
+# |  o  )|  D  ) /  [_ (   \_ |  |  ||  o  )|  |  | /  [_ (   \_ |      |Y  o  ||    \ Y     Y|  D  ) #
+# |   _/ |    / Y    _] \__  T|  |  ||   _/ |  |  |Y    _] \__  Tl_j  l_j|     ||  D  Y|  O  ||    /  #
+# |  |   |    \ |   [_  /  \ ||  :  ||  |   |  :  ||   [_  /  \ |  |  |  |  _  ||     ||     ||    \  #
+# |  |   |  .  Y|     T \    |l     ||  |   l     ||     T \    |  |  |  |  |  ||     |l     !|  .  Y #
+# l__j   l__j\_jl_____j  \___j \__,_jl__j    \__,_jl_____j  \___j  l__j  l__j__jl_____j \___/ l__j\_j #
+#                                                                                                     #
+#      Aplicación sencilla y a medida para generar PDFs de presupuestos con un formato estándar.      #
+#                                                                                                     #
+# Autor: Angelo Gallardi (angelogallardi@gmail.com)                                                   #
+# Año: 2025                                                                                           #
+# Versión: 1.0                                                                                        #
+#                                                                                                     #
+#######################################################################################################
+
+
+from PyQt5.QtWidgets import QMainWindow, QApplication, QLineEdit, QHeaderView, QFileDialog, QDialog, QMessageBox
+from PyQt5.QtCore import Qt, QDate, QSettings
+from PyQt5.QtGui import QIcon
 from PyQt5 import uic
 
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, Frame, ListFlowable, ListItem
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, ListFlowable, ListItem
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen.canvas import Canvas
@@ -17,21 +35,48 @@ import os
 import re
 
 
+class ConfiguracionDialog(QDialog):
+    def __init__(self, defaultFolder, settings):
+        super().__init__()
+
+        # Cargo el archivo .ui
+        uic.loadUi('ui/settings.ui', self)
+
+        # Inicializaciones varias
+        self.setWindowIcon(QIcon('resources/icons/icon.ico')) # Icono de la ventana
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint) # Quito signo "?" de barra de título
+        self.pushButton_seleccionar.clicked.connect(self.seleccionarCarpeta)
+        self.pushButton_cerrar.clicked.connect(self.close) # Uso close() para cerrar la ventana
+
+        # Guardo los parámetros recibidos
+        self.defaultFolder = defaultFolder
+        self.settings = settings
+
+        # Muestro la ruta actual en el line edit
+        self.lineEdit_carpeta.setText(self.settings.value('pdf_folder', self.defaultFolder))
+
+
+    def seleccionarCarpeta(self):
+        """Permite al usuario seleccionar una carpeta y la guarda en QSettings."""
+
+        folder = QFileDialog.getExistingDirectory(self, 'Seleccionar Carpeta', self.settings.value('pdf_folder', self.defaultFolder))
+        if folder:
+            self.settings.setValue('pdf_folder', folder) # Actualizo la ruta en QSettings
+            self.lineEdit_carpeta.setText(folder) # La muestro en el line edit
+
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         # Cargo el archivo .ui
-        uic.loadUi('ui/presupuestos.ui', self)
+        uic.loadUi('ui/presupuestador.ui', self)
 
         # Inicializaciones varias
         self.setWindowTitle('Presupuestador') # Título de la ventana
-        # self.setWindowIcon(QIcon('resources/icons/icon.ico')) # Icono de la ventana
+        self.setWindowIcon(QIcon('resources/icons/icon.ico')) # Icono de la ventana
         self.showMaximized() # Abro la ventana maximizada
-
-        # Carpeta de guardado de presupuestos
-        self.pdfFolder = 'D:\\Google Drive'
 
         # Configuro acciones disparadas por QPushButton
         self.pushButton_adddetalle.clicked.connect(self.agregarDetalle)
@@ -40,6 +85,7 @@ class MainWindow(QMainWindow):
         self.pushButton_delmonto.clicked.connect(self.eliminarMonto)
         self.pushButton_vaciar.clicked.connect(self.vaciar)
         self.pushButton_guardar.clicked.connect(self.guardar)
+        self.pushButton_config.clicked.connect(self.abrirConfiguracion)
 
         # Configuro acciones disparadas por QLineEdit
         self.lineEdit_total.textChanged.connect(self.formatearMonto)
@@ -47,6 +93,14 @@ class MainWindow(QMainWindow):
         # Configuro acciones disparadas por QTableWidget
         self.tableWidget_detalles.cellChanged.connect(self.celdaCambiada) # Señal que se emite cada vez que cambia el contenido de una celda
         self.tableWidget_montos.cellChanged.connect(self.celdaCambiada)
+
+        # Trato la ruta de guardado de los presupuestos
+        self.settings = QSettings('COMET', 'Presupuestador') # Creo QSettings para guardar/recuperar configuración (se almacena en registro de Windows)
+        self.defaultFolder = self.obtenerPathEscritorio() # Determino carpeta correcta del escritorio y la tomo como ruta de guardado por defecto
+        self.pdfFolder = self.settings.value('pdf_folder', self.defaultFolder) # Recupero carpeta guardada previamente, o uso carpeta por defecto
+
+        # Verifico si tengo el archivo de clientes, y sino lo creo
+        self.clientesPath = self.verificarArchivoClientes()
 
         # Cargo ítems en el ComboBox de clientes
         self.cargarClientes()
@@ -73,14 +127,44 @@ class MainWindow(QMainWindow):
                 sender.setRowHeight(fila, 30)
 
 
+    def verificarArchivoClientes(self):
+        """
+        Verifica si ya existe clientes.txt, o lo crea. El directorio "Presupuestador" donde
+        se coloca clientes.txt debe estar en C:/Users/%USERNAME%/AppData/Roaming para que
+        permita modificar el .txt (en Archivos de programa no está permitido). Ver, por ej,
+        https://getgreenshot.org/faq/where-does-greenshot-store-its-configuration-settings/
+        que hace lo mismo.
+        """
+
+        # Obtengo la ruta a AppData/Roaming
+        appdataPath = os.getenv('APPDATA')
+
+        # Ruta a la carpeta de clientes
+        clientesFolder = os.path.join(appdataPath, 'Presupuestador')
+        os.makedirs(clientesFolder, exist_ok=True) # Creo la carpeta si no existe
+
+        # Ruta completa al archivo de clientes
+        clientesPath = os.path.join(clientesFolder, 'clientes.txt')
+
+        # Verifico si clientes.txt ya existe
+        if not os.path.exists(clientesPath): # Verifico si el archivo no existe
+            with open(clientesPath, 'w') as f: # Creo el archivo vacío
+                f.write('')
+
+        return clientesPath
+
+
     def cargarClientes(self):
         """Carga los clientes desde el .txt y los pone en el combo box."""
 
+        # Limpio el contenido actual del combo box
+        self.comboBox_clientes.clear()
+
         # Creo la lista de clientes para agregar
         self.clientes = []
-        with open('clientes.txt', 'r') as archivo:
+        with open(self.clientesPath, 'r') as archivo:
             for linea in archivo:
-                self.clientes.append(linea.strip())
+                self.clientes.append(linea.strip()) # Elimino saltos de línea
         
         # Ordeno los clientes
         self.clientes.sort()
@@ -233,6 +317,23 @@ class MainWindow(QMainWindow):
         self.tableWidget_montos.setRowCount(0)
         self.lineEdit_total.clear()
         self.lineEdit_total.setPlaceholderText('')
+        self.deseleccionarRadioButtons()
+
+
+    def deseleccionarRadioButtons(self):
+        """
+        Desactiva y restaura la eutoexclusividad de los radio buttons para poder
+        deseleccionarlos.
+        """
+
+        self.radioButton_siniva.setAutoExclusive(False)
+        self.radioButton_coniva.setAutoExclusive(False)
+
+        self.radioButton_siniva.setChecked(False)
+        self.radioButton_coniva.setChecked(False)
+
+        self.radioButton_siniva.setAutoExclusive(True)
+        self.radioButton_coniva.setAutoExclusive(True)
 
 
     def guardar(self):
@@ -270,11 +371,11 @@ class MainWindow(QMainWindow):
             self.mostrarAdvertencia('Advertencia', mensaje)
             return
 
-        # Verifico si el cliente actual existe, y sino lo agrego a clientex.txt
+        # Verifico si el cliente actual existe, y sino lo agrego a clientes.txt
         clienteActual = self.comboBox_clientes.currentText()
         if clienteActual not in self.clientes:
-            with open('clientes.txt', 'a') as archivo:
-                archivo.write(clienteActual)
+            with open(self.clientesPath, 'a') as archivo:
+                archivo.write(clienteActual + '\n')
 
         # Obtengo una lista de los detalles
         listaDetalles = []
@@ -305,23 +406,12 @@ class MainWindow(QMainWindow):
         # Defino el nombre del archivo
         defaultFilename = f"{datos['fecha']}_{datos['cliente']}_{datos['titulo']}.pdf"
 
-        # Obtengo la carpeta por defecto que mostrará el QFileDialog de guardado
-        if os.path.exists(self.pdfFolder): # Si existe la carpeta de Google Drive, selecciono esa
-            defaultFolder = self.pdfFolder
-        else:
-            homeFolder = os.path.expanduser('~')
-            for folder in ('Escritorio', 'Desktop'):
-                desktopFolder = os.path.join(homeFolder, folder)
-                if os.path.exists(desktopFolder):
-                    defaultFolder = desktopFolder # Si no existe la carpeta de Google Drive, selecciono el Escritorio
-            defaultFolder = homeFolder # Como alternativa final, uso la carpeta de usuario
-
         # Genero cuadro de diálogo para guardar el PDF
         options = QFileDialog.Options()
         filePath, _ = QFileDialog.getSaveFileName(
             self, 
             'Guardar PDF', 
-            os.path.join(defaultFolder, defaultFilename), # Ubicación y nombre predeterminados
+            os.path.join(self.pdfFolder, defaultFilename), # Ubicación y nombre predeterminados
             'Archivos PDF (*.pdf)', 
             options=options
         )
@@ -339,6 +429,26 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 # Muestro mensaje de error en caso de fallo
                 QMessageBox.critical(self, 'Error', f'No se pudo generar el PDF:\n{str(e)}')
+
+
+    def abrirConfiguracion(self):
+        """Crea una instancia del QDialog de "Configuración" y lo muestra."""
+
+        dialog = ConfiguracionDialog(self.defaultFolder, self.settings)
+        dialog.exec_() # Muestra el diálogo en modo modal
+
+        # Actualizo la ruta de guardado después de que se cierre el diálogo
+        self.pdfFolder = self.settings.value('pdf_folder', self.pdfFolder)
+
+
+    def obtenerPathEscritorio(self):
+        """Determina el nombre correcto de la carpeta de escritorio y devuelve su ruta."""
+        homeFolder = os.path.expanduser('~')
+        for folder in ('Escritorio', 'Desktop'):
+            desktopFolder = os.path.join(homeFolder, folder)
+            if os.path.exists(desktopFolder):
+                return desktopFolder
+        return homeFolder # Como alternativa, uso la carpeta de usuario
 
 
     def mostrarAdvertencia(self, titulo, mensaje):
@@ -370,28 +480,32 @@ class MainWindow(QMainWindow):
         msgBox.setWindowTitle('Éxito')
         msgBox.setText(f'El presupuesto se guardó correctamente en:')
         msgBox.setInformativeText(os.path.dirname(filePath)) # Muestro la carpeta contenedora, no el path completo del archivo
-        
+
         # Añado botones de "Abrir carpeta" y "Cerrar"
-        botonAbrir = msgBox.addButton('Abrir carpeta', QMessageBox.ActionRole)
+        botonAbrirCarpeta = msgBox.addButton('Abrir carpeta', QMessageBox.ActionRole)
+        botonAbrirArchivo = msgBox.addButton('Abrir PDF', QMessageBox.ActionRole)
         botonCerrar = msgBox.addButton('Cerrar', QMessageBox.RejectRole)
 
         # Configuro el cursor de mano para los botones
-        botonAbrir.setCursor(Qt.PointingHandCursor)
+        botonAbrirCarpeta.setCursor(Qt.PointingHandCursor)
+        botonAbrirArchivo.setCursor(Qt.PointingHandCursor)
         botonCerrar.setCursor(Qt.PointingHandCursor)
 
         # Muestro el mensaje
         msgBox.exec_()
 
         # Verifico si el usuario seleccionó "Abrir carpeta"
-        if msgBox.clickedButton() == botonAbrir:
+        if msgBox.clickedButton() == botonAbrirCarpeta:
             os.startfile(os.path.dirname(filePath))
+        elif msgBox.clickedButton() == botonAbrirArchivo:
+            os.startfile(filePath)
 
 
     def crearPdf(self, datos, filePath):
         """Construye el PDF del presupuesto y lo guarda en la ruta que le pasamos."""
 
         # Defino tamaños de fuente
-        tamañoFuenteMontos = 11
+        tamañoFuenteMontos = 10
 
         # Defino los márgenes de la página (en puntos)
         margenIzq, margenDer = 60, 60
@@ -407,62 +521,90 @@ class MainWindow(QMainWindow):
         styles = getSampleStyleSheet()
         partesPdf = [] # Lista de elementos que se agregarán secuencialmente al PDF
 
-        headingStyle = ParagraphStyle(
-            name='EstiloTitulo',
+        introStyle = ParagraphStyle(
+            name='EstiloIntro',
             parent=styles['Heading2'],
-            textColor='#0d0d0d', 
-            spaceAfter=10
-        )
-
-        heading_normal = ParagraphStyle(
-            'HeadingNormal',
-            parent=styles['Heading1'],  # Basado en el estilo Heading1
-            fontName='Helvetica',      # Cambia a una fuente normal
-            fontSize=16,               # Tamaño del texto
-            leading=20,                # Espaciado entre líneas
-            spaceAfter=12              # Espacio después del heading
+            fontName='Helvetica',
+            textColor='#1a1a1a',
+            spaceBefore=6,
         )
 
         textStyle = ParagraphStyle(
             name='EstiloTexto',
-            parent=styles['BodyText'],
+            parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=11,
-            textColor='#0d0d0d', 
-            leading=15,  # Espaciado entre líneas
+            textColor='#1a1a1a', 
+            leading=14,  # Espaciado entre líneas
             spaceBefore=6,  # Espaciado antes del párrafo
             spaceAfter=6,  # Espaciado después del párrafo
-            alignment=4  # 4 indica alineación justificada
+            alignment=4,  # 4 indica alineación justificada
         )
 
         bulletStyle = ParagraphStyle(
             'Bullet',
             parent=textStyle,
             bulletIndent=5,  # Espacio más pequeño para la viñeta
-            leftIndent=-5,   # Reduce el espacio entre la viñeta y el texto
-            fontSize=11,     # Tamaño de la fuente
-            leading=14,      # Espaciado entre líneas
-            alignment=4      # 4 indica alineación justificada
-
+            leftIndent=-8,   # Reduce el espacio entre la viñeta y el texto
         )
+
+        estiloSecciones = ParagraphStyle(
+            name='EstiloSecciones',
+            parent=styles['Heading2'],
+            backColor=colors.gainsboro,
+            textColor='#1a1a1a',
+            borderWidth=0.5,
+            borderColor='#1a1a1a',
+            borderPadding=2,
+            spaceAfter=12 # Espacio después del párrafo
+        )
+
+        # ------------------------------------------------- LOGO -------------------------------------------------
+
+        # Cargo el logo del taller
+        rutaLogo = 'resources/img/logo.png'
+        logo = Image(rutaLogo)
+        logo.hAlign = 'RIGHT' # Alineo el logo a la derecha
+
+        # Obtengo el ancho y alto original de la imagen
+        anchoOriginal, altoOriginal = logo.imageWidth, logo.imageHeight
+
+        # Defino un ancho deseado
+        anchoDeseado = 80
+
+        # Calculo el alto proporcional al ancho deseado para respetar el aspect ratio
+        aspectRatio = altoOriginal / anchoOriginal
+        altoDeseado = anchoDeseado * aspectRatio
+
+        # Aplico las dimensiones ajustadas al logo
+        logo.drawWidth = anchoDeseado
+        logo.drawHeight = altoDeseado
+
+        # Añado espacio negativo para elevar el logo por encima del márgen superior
+        partesPdf.append(Spacer(1, -24))
+
+        # Agrego el logo al contenido del PDF
+        partesPdf.append(logo)
 
         # ------------------------------------------ CLIENTE, FECHA, TITULO --------------------------------------
         
         # Cliente
-        partesPdf.append(Paragraph(f"<b>Cliente:</b> {datos['cliente']}", heading_normal))
+        partesPdf.append(Paragraph(f"<b>Cliente:</b> {datos['cliente']}", introStyle))
         
         # Título
-        partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", heading_normal))
+        partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", introStyle))
 
         # Fecha
         fechaQdate = QDate.fromString(datos['fecha'], 'yyyy-MM-dd') # Convierto el string a un objeto QDate
         fechaConvertida = fechaQdate.toString('dd-MM-yyyy')
-        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", heading_normal))
+        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", introStyle))
 
         # Añado espacio entre secciones
         partesPdf.append(Spacer(1, 25))
 
         # ---------------------------------------------- DETALLES ------------------------------------------------
+
+        partesPdf.append(Paragraph('Detalles del trabajo', estiloSecciones))
 
         # Convierto los detalles en un ListFlowable con viñetas
         bulletList = ListFlowable(
@@ -477,6 +619,8 @@ class MainWindow(QMainWindow):
         partesPdf.append(Spacer(1, 25))
 
         # ----------------------------------------------- MONTOS -------------------------------------------------
+
+        partesPdf.append(Paragraph('Presupuesto', estiloSecciones))
 
         # Calculo cuántos caracteres monoespaciados caben en una línea
         anchoDoc, _ = A4 # Tamaño de la página en puntos (solo me interesa el ancho)
@@ -518,7 +662,7 @@ class MainWindow(QMainWindow):
         partesPdf.append(tabla)
 
         # Añado espacio entre secciones
-        partesPdf.append(Spacer(1, 25))
+        partesPdf.append(Spacer(1, 10))
 
         # -------------------------------------------- TOTAL COMO TEXTO ---------------------------------------------
 
