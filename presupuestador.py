@@ -555,7 +555,7 @@ class MainWindow(QMainWindow):
             textColor='#1a1a1a',
             # borderWidth=0.5,
             # borderColor='#1a1a1a',
-            borderPadding=10,
+            borderPadding=2,
             spaceAfter=12 # Espacio después del párrafo
         )
 
