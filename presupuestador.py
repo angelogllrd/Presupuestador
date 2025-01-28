@@ -382,7 +382,7 @@ class MainWindow(QMainWindow):
         for fila in range(self.tableWidget_detalles.rowCount()):
             item = self.tableWidget_detalles.item(fila, 0)
             if item and item.text().strip():
-                listaDetalles.append(item.text().capitalize())
+                listaDetalles.append(item.text()[0].upper() + item.text()[1:])
 
         # Obtengo una lista de los montos
         listaMontos = []
@@ -390,7 +390,7 @@ class MainWindow(QMainWindow):
             item = self.tableWidget_montos.item(fila, 0)
             monto = self.tableWidget_montos.cellWidget(fila, 1).text()
             if monto: # Solo considero válida la fila si hay un monto
-                listaMontos.append((item.text().capitalize() if item and item.text().strip() else '-', monto))
+                listaMontos.append((item.text()[0].upper() + item.text()[1:] if item and item.text().strip() else '-', monto))
 
         # Armo un dicccionario con la información que irá en el PDF
         datos = {
@@ -555,7 +555,7 @@ class MainWindow(QMainWindow):
             textColor='#1a1a1a',
             # borderWidth=0.5,
             # borderColor='#1a1a1a',
-            borderPadding=2,
+            borderPadding=10,
             spaceAfter=12 # Espacio después del párrafo
         )
 
@@ -623,33 +623,54 @@ class MainWindow(QMainWindow):
 
         partesPdf.append(Paragraph('Presupuesto', estiloSecciones))
 
-        # Calculo cuántos caracteres monoespaciados caben en una línea
+        # Calculo cuántos caracteres monoespaciados caben en un renglón
         anchoDoc, _ = A4 # Tamaño de la página en puntos (solo me interesa el ancho)
-        anchoDisponible = anchoDoc - margenIzq - margenDer
+        anchoDisponible = anchoDoc - margenIzq - margenDer # Espacio para texto de un renglón en puntos
         canvas = Canvas(None) # Creo un canvas temporal en memoria para poder usar stringWidth(), que dá el ancho exacto
-        anchoCaracter = canvas.stringWidth('A', fontName='Courier', fontSize=tamañoFuenteMontos) # Calculo el ancho de un carácter cualquiera
-        nroCaracteres = int(anchoDisponible // anchoCaracter) # Número de caracteres monoespaciados que caben en una línea
+        anchoCaracter = canvas.stringWidth('A', fontName='Courier', fontSize=tamañoFuenteMontos) # Calculo el ancho de un caracter monoespaciado cualquiera
+        maxCaracteresRenglon = int(anchoDisponible // anchoCaracter) # Número de caracteres monoespaciados que caben en un renglón
 
         # Encuentro longitud máxima de monto
-        longMaxMonto = len(datos['total']) # (Nunca será inferior que la del total)
+        maxCaracteresMonto = len(datos['total']) # (Siempre será menor o igual que la del total)
+
+        # Encuentro espacio disponible para el concepto
+        maxCaracteresConcepto = maxCaracteresRenglon - maxCaracteresMonto - 4 # Resto 4 porque: 2 caracteres de concepto se solapaban con el monto (maxCaracteresRenglon
+                                                                              # resulta en 79, pero solo entran 77 caracteres en el renglón), y otros 2 que dan el espacio
+                                                                              # entre el concepto y el signo "$" del monto.
 
         # Creo lista de filas para la tabla de montos
         tablaMontos = []
-        for detalle, monto in datos['montos']:
-            puntos = '.' * (nroCaracteres - len(detalle) - longMaxMonto - 4) # Calculo el relleno de puntos. El 4 fué prueba y error
-            tablaMontos.append([detalle + ' ' + puntos, monto])
+        for concepto, monto in datos['montos']:
+            palabras = concepto.split()
+            renglonesConcepto = ''
+            ultRenglonConcepto = ''
+
+            # Formo el string del concepto ajustado al ancho de la columna (dividido en líneas)
+            for palabra in palabras:
+                if len(ultRenglonConcepto + palabra) <= maxCaracteresConcepto: # La palabra entra en el renglón actual
+                    ultRenglonConcepto += palabra + ' '
+                else: # La palabra no entra, la pongo en un nuevo renglón
+                    renglonesConcepto += ultRenglonConcepto.rstrip() + '\n' # Inserto el nuevo renglón a los anteriores
+                    ultRenglonConcepto = palabra + ' ' # Reinicio el último renglón
+            ultRenglonConcepto = ultRenglonConcepto.rstrip() # Quito el último espacio después de la última palabra del último renglón
+            renglonesConcepto += ultRenglonConcepto # Inserto el último renglón a los anteriores
+
+            # Calculo cuántos puntos debo agregar al último renglón
+            puntos = '.' * (maxCaracteresRenglon - len(ultRenglonConcepto) - maxCaracteresMonto - 4) # Resto 4 por lo mismo de más arriba en "maxCaracteresConcepto"
+
+            tablaMontos.append([renglonesConcepto + puntos, monto])
 
         # Agrego la fila del total a la lista de filas de montos 
         tablaMontos = tablaMontos + [[f"TOTAL ({datos['iva']})", datos['total']]]
 
         # Calculo ancho de columnas de la tabla
-        anchoColumnaMonto = (longMaxMonto + 2) * anchoCaracter # Ancho máximo requerido (en puntos) por la columna "Monto"
+        anchoColumnaMonto = (maxCaracteresMonto + 2) * anchoCaracter # Ancho máximo requerido (en puntos) por la columna "Monto"
         anchoColumnaDetalle = anchoDisponible - anchoColumnaMonto        
 
         # Creo la tabla y ajusto sus columnas
         tabla = Table(tablaMontos, colWidths=[anchoColumnaDetalle, anchoColumnaMonto])
         tabla.setStyle(TableStyle([ # Las tuplas son (columna, fila)
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'), # Alineo los detalle de los montos a la izquierda
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'), # Alineo los conceptos de los montos a la izquierda
             ('ALIGN', (1, 0), (1, -1), 'RIGHT'), # Alineo los montos a la derecha
             ('ALIGN', (0, -1), (0, -1), 'RIGHT'), # Alineo la celda del "TOTAL" a la derecha
             ('TEXTCOLOR', (0, 0), (-1, -1), colors.black), # Color del texto

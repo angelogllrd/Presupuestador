@@ -567,6 +567,23 @@
    </layout>
   </widget>
  </widget>
+ <tabstops>
+  <tabstop>comboBox_clientes</tabstop>
+  <tabstop>dateEdit_fecha</tabstop>
+  <tabstop>lineEdit_titulo</tabstop>
+  <tabstop>radioButton_siniva</tabstop>
+  <tabstop>radioButton_coniva</tabstop>
+  <tabstop>pushButton_adddetalle</tabstop>
+  <tabstop>pushButton_deldetalle</tabstop>
+  <tabstop>tableWidget_detalles</tabstop>
+  <tabstop>pushButton_addmonto</tabstop>
+  <tabstop>pushButton_delmonto</tabstop>
+  <tabstop>tableWidget_montos</tabstop>
+  <tabstop>lineEdit_total</tabstop>
+  <tabstop>pushButton_vaciar</tabstop>
+  <tabstop>pushButton_guardar</tabstop>
+  <tabstop>pushButton_config</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
