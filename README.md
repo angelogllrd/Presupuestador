@@ -7,8 +7,11 @@ Aplicación para rellenar información de presupuestos, y generar automáticamen
 - 🔄`Cambiar carpeta de guardado por defecto` Permite cambiar la carpeta que se muestra por defecto al guardar el presupuesto.
 - 🧹`Limpiar ventana` Botón para limpiar el contenido actual y comenzar con otro presupuesto.
 
-### Interfaz y PDF
-![1](https://github.com/user-attachments/assets/9804076a-7d3c-4ab6-b2c0-645252723898)
+### Ejemplo de rellenado y PDF resultante
+![2025-01-28 01_05_10-Presupuestador](https://github.com/user-attachments/assets/8c1272a2-e9d5-44da-acc7-4cc57e4298aa)
 
-![2](https://github.com/user-attachments/assets/95f7e901-cad8-426c-b7ed-488c9d3ccf07)
+![3](https://github.com/user-attachments/assets/c95a3811-4b39-486e-9b2b-8f8c48a92509)
+
+
+
 
