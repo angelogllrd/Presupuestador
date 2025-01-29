@@ -19,7 +19,7 @@
 
 from PyQt5.QtWidgets import QMainWindow, QApplication, QLineEdit, QHeaderView, QFileDialog, QDialog, QMessageBox
 from PyQt5.QtCore import Qt, QDate, QSettings
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QFont
 from PyQt5 import uic
 
 from reportlab.lib.pagesizes import A4
@@ -78,6 +78,9 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon('resources/icons/icon.ico')) # Icono de la ventana
         self.showMaximized() # Abro la ventana maximizada
 
+        # Variables varias
+        self.anchoColumnaMonto = 160
+
         # Configuro acciones disparadas por QPushButton
         self.pushButton_adddetalle.clicked.connect(self.agregarDetalle)
         self.pushButton_deldetalle.clicked.connect(self.eliminarDetalle)
@@ -109,7 +112,7 @@ class MainWindow(QMainWindow):
         self.ponerFechaActual()
 
         # Ajusto el ancho de las columnas de ambas tablas equitativamente
-        self.repartirColumnas()
+        self.formatearTablas()
 
 
     def celdaCambiada(self, row, column):
@@ -182,11 +185,16 @@ class MainWindow(QMainWindow):
         self.dateEdit_fecha.setDate(QDate.currentDate())
 
 
-    def repartirColumnas(self):
-        """Ajusta el ancho de las columnas de ambas tablas equitativamente."""
+    def formatearTablas(self):
+        """Ajusta el ancho de las columnas y el alto de los encabezados de ambas tablas."""
 
-        self.tableWidget_detalles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.tableWidget_montos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tableWidget_detalles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # La única columna ocupa el espacio disponible
+        self.tableWidget_montos.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # La 1ra columna ocupa el espacio disponible que le deja la 2da
+        self.tableWidget_montos.setColumnWidth(1, self.anchoColumnaMonto) # Fijo el ancho de la segunda columna al mismo del QLineEdit del monto
+
+        # Modifico la altura de los encabezados horizontales de ambas tablas
+        self.tableWidget_detalles.horizontalHeader().setFixedHeight(23)
+        self.tableWidget_montos.horizontalHeader().setFixedHeight(23)
 
 
     def agregarDetalle(self):
@@ -216,10 +224,18 @@ class MainWindow(QMainWindow):
         if self.tableWidget_montos.rowCount() == 1:
             self.lineEdit_total.setPlaceholderText('$ 0')
 
-        # Inserto el QLineEdit del monto en la celda del monto
+        # Creo un QLineEdit y le doy formato
         lineEdit = QLineEdit()
         lineEdit.setPlaceholderText('$ 0')
         lineEdit.setAlignment(Qt.AlignRight)
+        lineEdit.setFixedWidth(self.anchoColumnaMonto)
+
+        # Configuro la fuente del monto
+        font = QFont('Courier', 11)
+        font.setBold(True)
+        lineEdit.setFont(font)
+
+        # Inserto el QLineEdit en la celda del monto
         self.tableWidget_montos.setCellWidget(nroFilas, 1, lineEdit)
 
         # Conecto señales al QLineEdit

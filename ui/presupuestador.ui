@@ -538,9 +538,16 @@
             <widget class="QLineEdit" name="lineEdit_total">
              <property name="maximumSize">
               <size>
-               <width>150</width>
+               <width>160</width>
                <height>16777215</height>
               </size>
+             </property>
+             <property name="font">
+              <font>
+               <family>Courier</family>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
              </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
