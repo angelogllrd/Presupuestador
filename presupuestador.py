@@ -36,7 +36,7 @@ import re
 
 
 class ConfiguracionDialog(QDialog):
-    def __init__(self, defaultFolder, settings):
+    def __init__(self, defaultFolderPath, settings):
         super().__init__()
 
         # Cargo el archivo .ui
@@ -49,19 +49,19 @@ class ConfiguracionDialog(QDialog):
         self.pushButton_cerrar.clicked.connect(self.close) # Uso close() para cerrar la ventana
 
         # Guardo los parámetros recibidos
-        self.defaultFolder = defaultFolder
+        self.defaultFolderPath = defaultFolderPath
         self.settings = settings
 
         # Muestro la ruta actual en el line edit
-        self.lineEdit_carpeta.setText(self.settings.value('pdf_folder', self.defaultFolder))
+        self.lineEdit_carpeta.setText(self.settings.value('pdfs_folder', self.defaultFolderPath))
 
 
     def seleccionarCarpeta(self):
         """Permite al usuario seleccionar una carpeta y la guarda en QSettings."""
 
-        folder = QFileDialog.getExistingDirectory(self, 'Seleccionar Carpeta', self.settings.value('pdf_folder', self.defaultFolder))
+        folder = QFileDialog.getExistingDirectory(self, 'Seleccionar Carpeta', self.settings.value('pdfs_folder', self.defaultFolderPath))
         if folder:
-            self.settings.setValue('pdf_folder', folder) # Actualizo la ruta en QSettings
+            self.settings.setValue('pdfs_folder', folder) # Actualizo la ruta en QSettings
             self.lineEdit_carpeta.setText(folder) # La muestro en el line edit
 
 
@@ -99,11 +99,11 @@ class MainWindow(QMainWindow):
 
         # Trato la ruta de guardado de los presupuestos
         self.settings = QSettings('COMET', 'Presupuestador') # Creo QSettings para guardar/recuperar configuración (se almacena en registro de Windows)
-        self.defaultFolder = self.obtenerPathEscritorio() # Determino carpeta correcta del escritorio y la tomo como ruta de guardado por defecto
-        self.pdfFolder = self.settings.value('pdf_folder', self.defaultFolder) # Recupero carpeta guardada previamente, o uso carpeta por defecto
+        self.defaultFolderPath = self.obtenerPathEscritorio() # Determino carpeta correcta del escritorio y la tomo como ruta de guardado por defecto
+        self.pdfsFolderPath = self.settings.value('pdfs_folder', self.defaultFolderPath) # Recupero carpeta guardada previamente, o uso carpeta por defecto
 
         # Verifico si tengo el archivo de clientes, y sino lo creo
-        self.clientesPath = self.verificarArchivoClientes()
+        self.clientesFilePath = self.verificarArchivoClientes()
 
         # Cargo ítems en el ComboBox de clientes
         self.cargarClientes()
@@ -140,21 +140,21 @@ class MainWindow(QMainWindow):
         """
 
         # Obtengo la ruta a AppData/Roaming
-        appdataPath = os.getenv('APPDATA')
+        appdataFolderPath = os.getenv('APPDATA')
 
         # Ruta a la carpeta de clientes
-        clientesFolder = os.path.join(appdataPath, 'Presupuestador')
-        os.makedirs(clientesFolder, exist_ok=True) # Creo la carpeta si no existe
+        clientesFolderPath = os.path.join(appdataFolderPath, 'Presupuestador')
+        os.makedirs(clientesFolderPath, exist_ok=True) # Creo la carpeta si no existe
 
         # Ruta completa al archivo de clientes
-        clientesPath = os.path.join(clientesFolder, 'clientes.txt')
+        clientesFilePath = os.path.join(clientesFolderPath, 'clientes.txt')
 
         # Verifico si clientes.txt ya existe
-        if not os.path.exists(clientesPath): # Verifico si el archivo no existe
-            with open(clientesPath, 'w') as f: # Creo el archivo vacío
+        if not os.path.exists(clientesFilePath): # Verifico si el archivo no existe
+            with open(clientesFilePath, 'w') as f: # Creo el archivo vacío
                 f.write('')
 
-        return clientesPath
+        return clientesFilePath
 
 
     def cargarClientes(self):
@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
 
         # Creo la lista de clientes para agregar
         self.clientes = []
-        with open(self.clientesPath, 'r') as archivo:
+        with open(self.clientesFilePath, 'r') as archivo:
             for linea in archivo:
                 self.clientes.append(linea.strip()) # Elimino saltos de línea
         
@@ -390,7 +390,7 @@ class MainWindow(QMainWindow):
         # Verifico si el cliente actual existe, y sino lo agrego a clientes.txt
         clienteActual = self.comboBox_clientes.currentText()
         if clienteActual not in self.clientes:
-            with open(self.clientesPath, 'a') as archivo:
+            with open(self.clientesFilePath, 'a') as archivo:
                 archivo.write(clienteActual + '\n')
 
         # Obtengo una lista de los detalles
@@ -424,21 +424,21 @@ class MainWindow(QMainWindow):
 
         # Genero cuadro de diálogo para guardar el PDF
         options = QFileDialog.Options()
-        filePath, _ = QFileDialog.getSaveFileName(
+        pdfFilePath, _ = QFileDialog.getSaveFileName(
             self, 
             'Guardar PDF', 
-            os.path.join(self.pdfFolder, defaultFilename), # Ubicación y nombre predeterminados
+            os.path.join(self.pdfsFolderPath, defaultFilename), # Ubicación y nombre predeterminados
             'Archivos PDF (*.pdf)', 
             options=options
         )
 
-        if filePath:
+        if pdfFilePath:
             try:
                 # Genero el PDF en la ubicación seleccionada
-                self.crearPdf(datos, filePath)
+                self.crearPdf(datos, pdfFilePath)
 
                 # Muestro un mensaje de éxito
-                self.mostrarMensajeGuardado(filePath)
+                self.mostrarMensajeGuardado(pdfFilePath)
 
                 # Limpio todo
                 self.vaciar()
@@ -450,21 +450,22 @@ class MainWindow(QMainWindow):
     def abrirConfiguracion(self):
         """Crea una instancia del QDialog de "Configuración" y lo muestra."""
 
-        dialog = ConfiguracionDialog(self.defaultFolder, self.settings)
+        dialog = ConfiguracionDialog(self.defaultFolderPath, self.settings)
         dialog.exec_() # Muestra el diálogo en modo modal
 
         # Actualizo la ruta de guardado después de que se cierre el diálogo
-        self.pdfFolder = self.settings.value('pdf_folder', self.pdfFolder)
+        self.pdfsFolderPath = self.settings.value('pdfs_folder', self.pdfsFolderPath)
 
 
     def obtenerPathEscritorio(self):
         """Determina el nombre correcto de la carpeta de escritorio y devuelve su ruta."""
-        homeFolder = os.path.expanduser('~')
+
+        homeFolderPath = os.path.expanduser('~')
         for folder in ('Escritorio', 'Desktop'):
-            desktopFolder = os.path.join(homeFolder, folder)
-            if os.path.exists(desktopFolder):
-                return desktopFolder
-        return homeFolder # Como alternativa, uso la carpeta de usuario
+            desktopFolderPath = os.path.join(homeFolderPath, folder)
+            if os.path.exists(desktopFolderPath):
+                return desktopFolderPath
+        return homeFolderPath # Como alternativa, uso la carpeta de usuario
 
 
     def mostrarAdvertencia(self, titulo, mensaje):
@@ -485,7 +486,7 @@ class MainWindow(QMainWindow):
         msgBox.exec_()
 
 
-    def mostrarMensajeGuardado(self, filePath):
+    def mostrarMensajeGuardado(self, pdfFilePath):
         """
         Muestra un mensaje tras el guardado del pdf, permitiendo abrir la carpeta de guardado.
         """
@@ -495,7 +496,7 @@ class MainWindow(QMainWindow):
         msgBox.setIcon(QMessageBox.Information)
         msgBox.setWindowTitle('Éxito')
         msgBox.setText(f'El presupuesto se guardó correctamente en:')
-        msgBox.setInformativeText(os.path.dirname(filePath)) # Muestro la carpeta contenedora, no el path completo del archivo
+        msgBox.setInformativeText(os.path.dirname(pdfFilePath)) # Muestro la carpeta contenedora, no el path completo del archivo
 
         # Añado botones de "Abrir carpeta" y "Cerrar"
         botonAbrirCarpeta = msgBox.addButton('Abrir carpeta', QMessageBox.ActionRole)
@@ -512,12 +513,12 @@ class MainWindow(QMainWindow):
 
         # Verifico si el usuario seleccionó "Abrir carpeta"
         if msgBox.clickedButton() == botonAbrirCarpeta:
-            os.startfile(os.path.dirname(filePath))
+            os.startfile(os.path.dirname(pdfFilePath))
         elif msgBox.clickedButton() == botonAbrirArchivo:
-            os.startfile(filePath)
+            os.startfile(pdfFilePath)
 
 
-    def crearPdf(self, datos, filePath):
+    def crearPdf(self, datos, pdfFilePath):
         """Construye el PDF del presupuesto y lo guarda en la ruta que le pasamos."""
 
         # Defino tamaños de fuente
@@ -528,7 +529,7 @@ class MainWindow(QMainWindow):
         margenSup, margenInf = 40, 40
 
         # Configuración básica del documento
-        doc = SimpleDocTemplate(filePath, 
+        doc = SimpleDocTemplate(pdfFilePath, 
                                 pagesize=A4,
                                 leftMargin=margenIzq,
                                 rightMargin=margenDer,
