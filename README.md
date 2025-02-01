@@ -8,9 +8,11 @@ Aplicación para rellenar información de presupuestos, y generar automáticamen
 - 🧹`Limpiar ventana` Botón para limpiar el contenido actual y comenzar con otro presupuesto.
 
 ### Ejemplo de rellenado y PDF resultante
-![2025-01-28 01_05_10-Presupuestador](https://github.com/user-attachments/assets/8c1272a2-e9d5-44da-acc7-4cc57e4298aa)
+![1](https://github.com/user-attachments/assets/a73fc1e5-ff36-4910-bb2f-7b6baaeeb5aa)
 
-![3](https://github.com/user-attachments/assets/c95a3811-4b39-486e-9b2b-8f8c48a92509)
+![2](https://github.com/user-attachments/assets/3875fc1f-6ef6-4199-b67a-b9fbf7c78c09)
+
+
 
 
 
