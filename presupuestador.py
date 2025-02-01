@@ -488,7 +488,8 @@ class MainWindow(QMainWindow):
 
     def mostrarMensajeGuardado(self, pdfFilePath):
         """
-        Muestra un mensaje tras el guardado del pdf, permitiendo abrir la carpeta de guardado.
+        Muestra un mensaje tras el guardado del PDF, permitiendo abrir la carpeta de guardado,
+        o abrir el PDF.
         """
 
         # Creo el QMessageBox
@@ -498,7 +499,7 @@ class MainWindow(QMainWindow):
         msgBox.setText(f'El presupuesto se guardó correctamente en:')
         msgBox.setInformativeText(os.path.dirname(pdfFilePath)) # Muestro la carpeta contenedora, no el path completo del archivo
 
-        # Añado botones de "Abrir carpeta" y "Cerrar"
+        # Añado botones de "Abrir carpeta", "Abrir PDF" y "Cerrar"
         botonAbrirCarpeta = msgBox.addButton('Abrir carpeta', QMessageBox.ActionRole)
         botonAbrirArchivo = msgBox.addButton('Abrir PDF', QMessageBox.ActionRole)
         botonCerrar = msgBox.addButton('Cerrar', QMessageBox.RejectRole)
@@ -511,7 +512,7 @@ class MainWindow(QMainWindow):
         # Muestro el mensaje
         msgBox.exec_()
 
-        # Verifico si el usuario seleccionó "Abrir carpeta"
+        # Verifico si el usuario seleccionó "Abrir carpeta" o "Abrir PDF"
         if msgBox.clickedButton() == botonAbrirCarpeta:
             os.startfile(os.path.dirname(pdfFilePath))
         elif msgBox.clickedButton() == botonAbrirArchivo:
