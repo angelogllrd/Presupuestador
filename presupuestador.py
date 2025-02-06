@@ -405,8 +405,9 @@ class MainWindow(QMainWindow):
         for fila in range(self.tableWidget_montos.rowCount()):
             item = self.tableWidget_montos.item(fila, 0)
             monto = self.tableWidget_montos.cellWidget(fila, 1).text()
+            montoLimpio = re.sub(r'[$ ]', '', monto) # Solamente quiero el monto sin signo $
             if monto: # Solo considero válida la fila si hay un monto
-                listaMontos.append((item.text()[0].upper() + item.text()[1:] if item and item.text().strip() else '-', monto))
+                listaMontos.append((item.text()[0].upper() + item.text()[1:] if item and item.text().strip() else '-', montoLimpio))
 
         # Armo un dicccionario con la información que irá en el PDF
         datos = {
@@ -523,7 +524,7 @@ class MainWindow(QMainWindow):
         """Construye el PDF del presupuesto y lo guarda en la ruta que le pasamos."""
 
         # Defino tamaños de fuente
-        tamañoFuenteMontos = 10
+        tamañoFuenteMontos = 11
 
         # Defino los márgenes de la página (en puntos)
         margenIzq, margenDer = 60, 60
@@ -537,33 +538,32 @@ class MainWindow(QMainWindow):
                                 topMargin=margenSup,
                                 bottomMargin=margenInf)
         styles = getSampleStyleSheet()
-        partesPdf = [] # Lista de elementos que se agregarán secuencialmente al PDF
+        partesPdf = [] # Lista de elementos que se agregarán secuencialmente al PDF        
 
-        introStyle = ParagraphStyle(
-            name='EstiloIntro',
-            parent=styles['Heading2'],
-            fontName='Helvetica',
-            textColor='#1a1a1a',
-            spaceBefore=6,
-        )
-
-        textStyle = ParagraphStyle(
+        estiloTexto = ParagraphStyle(
             name='EstiloTexto',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=11,
             textColor='#1a1a1a', 
-            leading=14,  # Espaciado entre líneas
-            spaceBefore=6,  # Espaciado antes del párrafo
-            spaceAfter=6,  # Espaciado después del párrafo
-            alignment=4,  # 4 indica alineación justificada
+            leading=14, # Espaciado entre líneas
+            spaceBefore=6, # Espaciado antes del párrafo
+            spaceAfter=6, # Espaciado después del párrafo
+            alignment=4, # 4 indica alineación justificada
         )
 
-        bulletStyle = ParagraphStyle(
-            'Bullet',
-            parent=textStyle,
-            bulletIndent=5,  # Espacio más pequeño para la viñeta
-            leftIndent=-8,   # Reduce el espacio entre la viñeta y el texto
+        estiloIntro = ParagraphStyle(
+            name='EstiloIntro',
+            parent=estiloTexto,
+            fontSize=12,
+            leading=14.4
+        )
+
+        estiloDetalles = ParagraphStyle(
+            name='EstiloDetalles',
+            parent=estiloTexto,
+            bulletIndent=5, # Espacio más pequeño para la viñeta
+            leftIndent=-8, # Reduce el espacio entre la viñeta y el texto
         )
 
         estiloSecciones = ParagraphStyle(
@@ -571,10 +571,10 @@ class MainWindow(QMainWindow):
             parent=styles['Heading2'],
             backColor=colors.gainsboro,
             textColor='#1a1a1a',
-            # borderWidth=0.5,
-            # borderColor='#1a1a1a',
+            fontSize=12,
             borderPadding=2,
-            spaceAfter=12 # Espacio después del párrafo
+            leading=16,
+            spaceAfter=12
         )
 
         # ------------------------------------------------- LOGO -------------------------------------------------
@@ -607,15 +607,15 @@ class MainWindow(QMainWindow):
         # ------------------------------------------ CLIENTE, FECHA, TITULO --------------------------------------
         
         # Cliente
-        partesPdf.append(Paragraph(f"<b>Cliente:</b> {datos['cliente']}", introStyle))
+        partesPdf.append(Paragraph(f"<b>Cliente:</b> {datos['cliente']}", estiloIntro))
         
         # Título
-        partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", introStyle))
+        partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", estiloIntro))
 
         # Fecha
         fechaQdate = QDate.fromString(datos['fecha'], 'yyyy-MM-dd') # Convierto el string a un objeto QDate
         fechaConvertida = fechaQdate.toString('dd-MM-yyyy')
-        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", introStyle))
+        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", estiloIntro))
 
         # Añado espacio entre secciones
         partesPdf.append(Spacer(1, 25))
@@ -627,7 +627,7 @@ class MainWindow(QMainWindow):
 
             # Convierto los detalles en un ListFlowable con viñetas
             bulletList = ListFlowable(
-                [ListItem(Paragraph(detalle, bulletStyle)) for detalle in datos['detalles']],
+                [ListItem(Paragraph(detalle, estiloDetalles)) for detalle in datos['detalles']],
                 bulletType='bullet' # Opción para viñetas (puedo usar "1" para numeración)
             )
 
@@ -653,8 +653,8 @@ class MainWindow(QMainWindow):
 
         # Encuentro espacio disponible para el concepto
         maxCaracteresConcepto = maxCaracteresRenglon - maxCaracteresMonto - 4 # Resto 4 porque: 2 caracteres de concepto se solapaban con el monto (maxCaracteresRenglon
-                                                                              # resulta en 79, pero solo entran 77 caracteres en el renglón), y otros 2 que dan el espacio
-                                                                              # entre el concepto y el signo "$" del monto.
+                                                                              # da 72 (para tamañoFuenteMontos = 11), pero solo entran 70 caracteres en el renglón), y 
+                                                                              # otros 2 que dan el espacio entre el concepto y el signo "$" del monto.
 
         # Creo lista de filas para la tabla de montos
         tablaMontos = []
@@ -676,7 +676,7 @@ class MainWindow(QMainWindow):
             # Calculo cuántos puntos debo agregar al último renglón
             puntos = '.' * (maxCaracteresRenglon - len(ultRenglonConcepto) - maxCaracteresMonto - 4) # Resto 4 por lo mismo de más arriba en "maxCaracteresConcepto"
 
-            tablaMontos.append([renglonesConcepto + puntos, monto])
+            tablaMontos.append([renglonesConcepto + puntos, '$' + ((maxCaracteresMonto - len(monto)) - 1) * ' ' + monto])
 
         # Agrego la fila del total a la lista de filas de montos 
         tablaMontos = tablaMontos + [[f"TOTAL ({datos['iva']})", datos['total']]]
@@ -712,7 +712,7 @@ class MainWindow(QMainWindow):
         # Convierto el entero a texto
         montoComoTexto = num2words(montoEntero, lang='es').capitalize()
 
-        partesPdf.append(Paragraph(f"<b>Son pesos:</b> {montoComoTexto} ({datos['iva']} incluido).", textStyle))
+        partesPdf.append(Paragraph(f"<b>Son pesos:</b> {montoComoTexto} ({datos['iva']} incluido).", estiloTexto))
 
 
         # Genero el PDF
