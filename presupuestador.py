@@ -614,9 +614,8 @@ class MainWindow(QMainWindow):
         partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", estiloIntro))
 
         # Fecha
-        fechaQdate = QDate.fromString(datos['fecha'], 'yyMMdd') # Convierto el string a un objeto QDate
-        fechaConvertida = fechaQdate.toString('dd-MM-yyyy')
-        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", estiloIntro))
+        fechaQdate = self.dateEdit_fecha.date().toString('dd-MM-yyyy')
+        partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaQdate}", estiloIntro))
 
         # Añado espacio entre secciones
         partesPdf.append(Spacer(1, 25))
