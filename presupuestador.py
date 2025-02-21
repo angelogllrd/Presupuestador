@@ -18,7 +18,7 @@
 
 
 from PyQt5.QtWidgets import QMainWindow, QApplication, QLineEdit, QHeaderView, QFileDialog, QDialog, QMessageBox
-from PyQt5.QtCore import Qt, QDate, QSettings
+from PyQt5.QtCore import Qt, QDate, QSettings, QTime
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5 import uic
 
@@ -412,7 +412,8 @@ class MainWindow(QMainWindow):
         # Armo un dicccionario con la información que irá en el PDF
         datos = {
             'cliente': self.comboBox_clientes.currentText(),
-            'fecha': self.dateEdit_fecha.date().toString('yyyy-MM-dd'),
+            'fecha': self.dateEdit_fecha.date().toString('yyMMdd'),
+            'hora': QTime.currentTime().toString('HHmm'),
             'titulo': self.lineEdit_titulo.text(),
             'iva': 'sin IVA' if self.radioButton_siniva.isChecked() else 'con IVA',
             'detalles': listaDetalles,
@@ -421,7 +422,7 @@ class MainWindow(QMainWindow):
         }
 
         # Defino el nombre del archivo
-        defaultFilename = f"{datos['fecha']}_{datos['cliente']}_{datos['titulo']}.pdf"
+        defaultFilename = f"{datos['fecha']}{datos['hora']}_{datos['cliente']}_{datos['titulo']}.pdf"
 
         # Genero cuadro de diálogo para guardar el PDF
         options = QFileDialog.Options()
@@ -538,7 +539,7 @@ class MainWindow(QMainWindow):
                                 topMargin=margenSup,
                                 bottomMargin=margenInf)
         styles = getSampleStyleSheet()
-        partesPdf = [] # Lista de elementos que se agregarán secuencialmente al PDF        
+        partesPdf = [] # Lista de elementos que se agregarán secuencialmente al PDF
 
         estiloTexto = ParagraphStyle(
             name='EstiloTexto',
@@ -613,7 +614,7 @@ class MainWindow(QMainWindow):
         partesPdf.append(Paragraph(f"<b>Presupuesto para:</b> {datos['titulo']}", estiloIntro))
 
         # Fecha
-        fechaQdate = QDate.fromString(datos['fecha'], 'yyyy-MM-dd') # Convierto el string a un objeto QDate
+        fechaQdate = QDate.fromString(datos['fecha'], 'yyMMdd') # Convierto el string a un objeto QDate
         fechaConvertida = fechaQdate.toString('dd-MM-yyyy')
         partesPdf.append(Paragraph(f"<b>Fecha:</b> {fechaConvertida}", estiloIntro))
 
