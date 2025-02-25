@@ -1,5 +1,3 @@
-# Presupuestador
-
 Aplicación para rellenar información de presupuestos, y generar automáticamente PDFs con un formato estándar. Algunas de sus funciones destacadas son:
 - 🧑`Historial de clientes` Si se ingresa un cliente que no está en la lista, el mismo se agregará al historial al guardar el PDF.
 - 🔍`Detalles del trabajo` Una sección para ingresar detalles del trabajo en forma de ítems, con ajuste automático de líneas largas.
@@ -8,17 +6,6 @@ Aplicación para rellenar información de presupuestos, y generar automáticamen
 - 🧹`Limpiar ventana` Botón para limpiar el contenido actual y comenzar con otro presupuesto.
 
 ### Ejemplo de rellenado y PDF resultante
-![1](https://github.com/user-attachments/assets/37ad50e6-b0ed-459b-959a-c0ecf720e500)
+![ui](https://github.com/user-attachments/assets/a4ceef12-b475-488e-902c-c926903367b4)
 
-![2](https://github.com/user-attachments/assets/8ab6bc15-2f6a-4cc5-86d3-ae601d4cd74d)
-
-
-
-
-
-
-
-
-
-
-
+![pdf](https://github.com/user-attachments/assets/17a6ec89-fc93-4706-9e72-cfe68ecab407)
