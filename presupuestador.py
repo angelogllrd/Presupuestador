@@ -704,7 +704,7 @@ class MainWindow(QMainWindow):
         # Añado espacio entre secciones
         partesPdf.append(Spacer(1, 10))
 
-        # -------------------------------------------- TOTAL COMO TEXTO ---------------------------------------------
+        # -------------------------------------------- TOTAL COMO TEXTO Y VALIDEZ ---------------------------------------------
 
         # Convierto el total a entero
         montoEntero = int(re.sub(r'\D', '', datos['total']))
@@ -714,6 +714,8 @@ class MainWindow(QMainWindow):
 
         partesPdf.append(Paragraph(f"<b>Son pesos:</b> {montoComoTexto} ({datos['iva']} incluido).", estiloTexto))
 
+        dias = self.spinBox_validez.value()
+        partesPdf.append(Paragraph(f'<b>Validez del presupuesto:</b> {dias} día{'' if dias == 1 else 's'}.', estiloTexto))
 
         # Genero el PDF
         doc.build(partesPdf)
