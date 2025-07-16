@@ -12,7 +12,7 @@
 #                                                                                                     #
 # Autor: Angelo Gallardi (angelogallardi@gmail.com)                                                   #
 # Año: 2025                                                                                           #
-# Versión: 1.0                                                                                        #
+# Versión: 1.1.0                                                                                      #
 #                                                                                                     #
 #######################################################################################################
 
@@ -29,6 +29,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen.canvas import Canvas
 
 from num2words import num2words
+
+import subprocess
 
 import sys
 import os
@@ -89,6 +91,7 @@ class MainWindow(QMainWindow):
         self.pushButton_vaciar.clicked.connect(self.vaciar)
         self.pushButton_guardar.clicked.connect(self.guardar)
         self.pushButton_config.clicked.connect(self.abrirConfiguracion)
+        self.pushButton_editarclientes.clicked.connect(self.editarClientes)
 
         # Configuro acciones disparadas por QLineEdit
         self.lineEdit_total.textChanged.connect(self.formatearMonto)
@@ -185,12 +188,27 @@ class MainWindow(QMainWindow):
         self.dateEdit_fecha.setDate(QDate.currentDate())
 
 
+    def editarClientes(self):
+        """Abre el archivo de clientes y espera a que se cierre el editor."""
+
+        # Abro el archivo con el Bloc de notas y espera que se cierre
+        proceso = subprocess.Popen(['notepad.exe', self.clientesFilePath])
+        proceso.wait()  # Espero hasta que el usuario cierre el Bloc de notas
+
+        # Cuando se cierra el editor, actualizo el combo box
+        self.cargarClientes()
+
+
     def formatearTablas(self):
         """Ajusta el ancho de las columnas y el alto de los encabezados de ambas tablas."""
 
+        # Para la tabla detalles
         self.tableWidget_detalles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # La única columna ocupa el espacio disponible
-        self.tableWidget_montos.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # La 1ra columna ocupa el espacio disponible que le deja la 2da
-        self.tableWidget_montos.setColumnWidth(1, self.anchoColumnaMonto) # Fijo el ancho de la segunda columna al mismo del QLineEdit del monto
+
+        # Para la tabla montos
+        self.tableWidget_montos.setColumnWidth(0, 100) # Fijo el ancho de la 1ra columna
+        self.tableWidget_montos.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # La 2da columna ocupa el espacio disponible que le dejan la 1ra y la 3ra
+        self.tableWidget_montos.setColumnWidth(2, self.anchoColumnaMonto) # Fijo el ancho de la segunda columna al mismo del QLineEdit del monto
 
         # Modifico la altura de los encabezados horizontales de ambas tablas
         self.tableWidget_detalles.horizontalHeader().setFixedHeight(23)
@@ -236,7 +254,7 @@ class MainWindow(QMainWindow):
         lineEdit.setFont(font)
 
         # Inserto el QLineEdit en la celda del monto
-        self.tableWidget_montos.setCellWidget(nroFilas, 1, lineEdit)
+        self.tableWidget_montos.setCellWidget(nroFilas, 2, lineEdit)
 
         # Conecto señales al QLineEdit
         lineEdit.textEdited.connect(self.formatearMonto)
@@ -293,7 +311,7 @@ class MainWindow(QMainWindow):
 
         # Recorro las filas y voy sumando montos
         for fila in range(self.tableWidget_montos.rowCount()):
-            stringMonto = self.limpiarMonto(self.tableWidget_montos.cellWidget(fila, 1).text())
+            stringMonto = self.limpiarMonto(self.tableWidget_montos.cellWidget(fila, 2).text())
 
             if stringMonto: # Verifico que tenga un monto (porque si está el placeholder text hay un string vacio)
                 monto = int(stringMonto)
@@ -357,7 +375,7 @@ class MainWindow(QMainWindow):
         * Verifica si se completó lo necesario y de lo contrario lo informa.
         * Agrega el cliente presente en el combo box si no estaba en la lista.
         * Reúne los datos para armar el PDF.
-        * Genera el cuadro de diálogo para guardar el PDF.
+        * Genera los cuadros diálogo para guardar los PDF para el taller y para el cliente.
         """
 
         # Verifico que se haya completado lo necesario
@@ -402,12 +420,18 @@ class MainWindow(QMainWindow):
 
         # Obtengo una lista de los montos
         listaMontos = []
+        hayCantidades = False
         for fila in range(self.tableWidget_montos.rowCount()):
-            item = self.tableWidget_montos.item(fila, 0)
-            monto = self.tableWidget_montos.cellWidget(fila, 1).text()
-            montoLimpio = re.sub(r'[$ ]', '', monto) # Solamente quiero el monto sin signo $
+            cantidad = self.tableWidget_montos.item(fila, 0)
+            if cantidad and cantidad.text().strip():
+                hayCantidades = True
+            item = self.tableWidget_montos.item(fila, 1)
+            monto = self.tableWidget_montos.cellWidget(fila, 2).text()
             if monto: # Solo considero válida la fila si hay un monto
-                listaMontos.append((item.text()[0].upper() + item.text()[1:] if item and item.text().strip() else '-', montoLimpio))
+                listaMontos.append((
+                    cantidad.text() if cantidad and cantidad.text().strip() else '',
+                    item.text()[0].upper() + item.text()[1:] if item and item.text().strip() else '', 
+                    monto))
 
         # Armo un dicccionario con la información que irá en el PDF
         datos = {
@@ -421,32 +445,55 @@ class MainWindow(QMainWindow):
             'total': self.lineEdit_total.text()
         }
 
-        # Defino el nombre del archivo
-        defaultFilename = f"{datos['fecha']}{datos['hora']}_{datos['cliente']}_{datos['titulo']}.pdf"
+        guardados = [] # Lista para guardar los nombres de los PDFs exitosos
 
-        # Genero cuadro de diálogo para guardar el PDF
-        options = QFileDialog.Options()
-        pdfFilePath, _ = QFileDialog.getSaveFileName(
+        if hayCantidades:
+            # Defino el nombre del archivo para taller
+            defaultFilenameTaller = f"{datos['fecha']}{datos['hora']}_{datos['cliente']}_{datos['titulo']}_completo.pdf"
+
+            # Genero cuadro de diálogo para guardar el PDF con cantidades
+            pdfConCantidadesPath, _ = QFileDialog.getSaveFileName(
+                self, 
+                'Guardar PDF (para taller)', 
+                os.path.join(self.pdfsFolderPath, defaultFilenameTaller),
+                'Archivos PDF (*.pdf);;Todos los archivos (*)'
+            )
+
+            # Guardo el pdf con cantidades
+            if pdfConCantidadesPath:
+                if not pdfConCantidadesPath.lower().endswith('.pdf'):
+                    pdfConCantidadesPath += '.pdf'
+                try:
+                    self.crearPdf(datos, pdfConCantidadesPath, incluirCantidades=True)
+                    guardados.append(pdfConCantidadesPath)
+                except Exception as e:
+                    QMessageBox.critical(self, 'Error', f'No se pudo generar el PDF para taller:\n{str(e)}')
+
+        # Defino el nombre del archivo para cliente
+        defaultFilenameCliente = f"{datos['fecha']}{datos['hora']}_{datos['cliente']}_{datos['titulo']}.pdf"
+
+        # Genero cuadro de diálogo para guardar el PDF sin cantidades
+        pdfSinCantidadesPath, _ = QFileDialog.getSaveFileName(
             self, 
-            'Guardar PDF', 
-            os.path.join(self.pdfsFolderPath, defaultFilename), # Ubicación y nombre predeterminados
-            'Archivos PDF (*.pdf)', 
-            options=options
+            'Guardar PDF (para cliente)', 
+            os.path.join(self.pdfsFolderPath, defaultFilenameCliente),
+            'Archivos PDF (*.pdf);;Todos los archivos (*)'
         )
 
-        if pdfFilePath:
+        # Guardo el pdf sin cantidades
+        if pdfSinCantidadesPath:
+            if not pdfSinCantidadesPath.lower().endswith('.pdf'):
+                pdfSinCantidadesPath += '.pdf'
             try:
-                # Genero el PDF en la ubicación seleccionada
-                self.crearPdf(datos, pdfFilePath)
-
-                # Muestro un mensaje de éxito
-                self.mostrarMensajeGuardado(pdfFilePath)
-
-                # Limpio todo
-                self.vaciar()
+                self.crearPdf(datos, pdfSinCantidadesPath, incluirCantidades=False)
+                guardados.append(pdfSinCantidadesPath)
             except Exception as e:
-                # Muestro mensaje de error en caso de fallo
-                QMessageBox.critical(self, 'Error', f'No se pudo generar el PDF:\n{str(e)}')
+                QMessageBox.critical(self, 'Error', f'No se pudo generar el PDF para cliente:\n{str(e)}')
+
+        # Muestro mensaje y limpio todo si se guardó al menos un PDF
+        if guardados:
+            self.mostrarMensajeGuardado(guardados)
+            self.vaciar()
 
 
     def abrirConfiguracion(self):
@@ -488,22 +535,35 @@ class MainWindow(QMainWindow):
         msgBox.exec_()
 
 
-    def mostrarMensajeGuardado(self, pdfFilePath):
+    def mostrarMensajeGuardado(self, guardados):
         """
-        Muestra un mensaje tras el guardado del PDF, permitiendo abrir la carpeta de guardado,
-        o abrir el PDF.
+        Muestra un mensaje tras el guardado del/los PDF, permitiendo abrir la/s carpeta/s de guardado,
+        o abrir el/los PDF.
         """
+
+        if len(guardados) > 1:
+            text = 'Ambas versiones del presupuesto se guardaron en:'
+            if os.path.dirname(guardados[0]) == os.path.dirname(guardados[1]):
+                informativeText = f'{os.path.dirname(guardados[0])}'
+            else:
+                informativeText = f'{os.path.dirname(guardados[0])}\n{os.path.dirname(guardados[1])}'
+            s = 's'
+        else:
+            text = 'El presupuesto se guardó correctamente en:'
+            informativeText = f'{os.path.dirname(guardados[0])}'
+            s = ''
 
         # Creo el QMessageBox
         msgBox = QMessageBox(self)
         msgBox.setIcon(QMessageBox.Information)
         msgBox.setWindowTitle('Éxito')
-        msgBox.setText(f'El presupuesto se guardó correctamente en:')
-        msgBox.setInformativeText(os.path.dirname(pdfFilePath)) # Muestro la carpeta contenedora, no el path completo del archivo
+        msgBox.setText(text)
+        msgBox.setInformativeText(informativeText)
 
         # Añado botones de "Abrir carpeta", "Abrir PDF" y "Cerrar"
-        botonAbrirCarpeta = msgBox.addButton('Abrir carpeta', QMessageBox.ActionRole)
-        botonAbrirArchivo = msgBox.addButton('Abrir PDF', QMessageBox.ActionRole)
+         
+        botonAbrirCarpeta = msgBox.addButton(f'Abrir carpeta{s}', QMessageBox.ActionRole)
+        botonAbrirArchivo = msgBox.addButton(f'Abrir PDF{s}', QMessageBox.ActionRole)
         botonCerrar = msgBox.addButton('Cerrar', QMessageBox.RejectRole)
 
         # Configuro el cursor de mano para los botones
@@ -516,16 +576,19 @@ class MainWindow(QMainWindow):
 
         # Verifico si el usuario seleccionó "Abrir carpeta" o "Abrir PDF"
         if msgBox.clickedButton() == botonAbrirCarpeta:
-            os.startfile(os.path.dirname(pdfFilePath))
+            for path in guardados:
+                os.startfile(os.path.dirname(path))
         elif msgBox.clickedButton() == botonAbrirArchivo:
-            os.startfile(pdfFilePath)
+            for path in guardados:
+                os.startfile(path)
 
 
-    def crearPdf(self, datos, pdfFilePath):
+    def crearPdf(self, datos, pdfFilePath, incluirCantidades):
         """Construye el PDF del presupuesto y lo guarda en la ruta que le pasamos."""
 
         # Defino tamaños de fuente
-        tamañoFuenteMontos = 11
+        tamTextoNormal = 11
+        tamTextoGrande = tamTextoNormal + 1
 
         # Defino los márgenes de la página (en puntos)
         margenIzq, margenDer = 60, 60
@@ -545,7 +608,7 @@ class MainWindow(QMainWindow):
             name='EstiloTexto',
             parent=styles['Normal'],
             fontName='Helvetica',
-            fontSize=11,
+            fontSize=tamTextoNormal,
             textColor='#1a1a1a', 
             leading=14, # Espaciado entre líneas
             spaceBefore=6, # Espaciado antes del párrafo
@@ -556,7 +619,7 @@ class MainWindow(QMainWindow):
         estiloIntro = ParagraphStyle(
             name='EstiloIntro',
             parent=estiloTexto,
-            fontSize=12,
+            fontSize=tamTextoGrande,
             leading=14.4
         )
 
@@ -572,7 +635,7 @@ class MainWindow(QMainWindow):
             parent=styles['Heading2'],
             backColor=colors.gainsboro,
             textColor='#1a1a1a',
-            fontSize=12,
+            fontSize=tamTextoGrande,
             borderPadding=2,
             leading=16,
             spaceAfter=12
@@ -641,62 +704,62 @@ class MainWindow(QMainWindow):
 
         partesPdf.append(Paragraph('Presupuesto', estiloSecciones))
 
-        # Calculo cuántos caracteres monoespaciados caben en un renglón
+        # Calculo espacios para columnas
         anchoDoc, _ = A4 # Tamaño de la página en puntos (solo me interesa el ancho)
         anchoDisponible = anchoDoc - margenIzq - margenDer # Espacio para texto de un renglón en puntos
-        canvas = Canvas(None) # Creo un canvas temporal en memoria para poder usar stringWidth(), que dá el ancho exacto
-        anchoCaracter = canvas.stringWidth('A', fontName='Courier', fontSize=tamañoFuenteMontos) # Calculo el ancho de un caracter monoespaciado cualquiera
-        maxCaracteresRenglon = int(anchoDisponible // anchoCaracter) # Número de caracteres monoespaciados que caben en un renglón
+        canvas = Canvas(None) # Canvas temporal para obtener el ancho del total (monto más largo) con stringWidth()
+        anchoColumnaMonto = canvas.stringWidth(datos['total'], fontName='Helvetica-Bold', fontSize=tamTextoGrande)
+        anchoRestante = anchoDisponible - anchoColumnaMonto
 
-        # Encuentro longitud máxima de monto
-        maxCaracteresMonto = len(datos['total']) # (Siempre será menor o igual que la del total)
-
-        # Encuentro espacio disponible para el concepto
-        maxCaracteresConcepto = maxCaracteresRenglon - maxCaracteresMonto - 4 # Resto 4 porque: 2 caracteres de concepto se solapaban con el monto (maxCaracteresRenglon
-                                                                              # da 72 (para tamañoFuenteMontos = 11), pero solo entran 70 caracteres en el renglón), y 
-                                                                              # otros 2 que dan el espacio entre el concepto y el signo "$" del monto.
-
-        # Creo lista de filas para la tabla de montos
+        # Armo la tabla de montos como una lista de listas
         tablaMontos = []
-        for concepto, monto in datos['montos']:
-            palabras = concepto.split()
-            renglonesConcepto = ''
-            ultRenglonConcepto = ''
+        for fila in datos['montos']:
+            cantidad, concepto, monto = fila
+            if incluirCantidades:
+                filaTabla = [Paragraph(cantidad, estiloTexto), Paragraph(concepto, estiloTexto), monto]
+            else:
+                filaTabla = [Paragraph(concepto, estiloTexto), monto]
+            tablaMontos.append(filaTabla)
 
-            # Formo el string del concepto ajustado al ancho de la columna (dividido en líneas)
-            for palabra in palabras:
-                if len(ultRenglonConcepto + palabra) <= maxCaracteresConcepto: # La palabra entra en el renglón actual
-                    ultRenglonConcepto += palabra + ' '
-                else: # La palabra no entra, la pongo en un nuevo renglón
-                    renglonesConcepto += ultRenglonConcepto.rstrip() + '\n' # Inserto el nuevo renglón a los anteriores
-                    ultRenglonConcepto = palabra + ' ' # Reinicio el último renglón
-            ultRenglonConcepto = ultRenglonConcepto.rstrip() # Quito el último espacio después de la última palabra del último renglón
-            renglonesConcepto += ultRenglonConcepto # Inserto el último renglón a los anteriores
+        # Agrego la fila del total y creo la tabla
+        if incluirCantidades:
+            tablaMontos.append(['', f"TOTAL ({datos['iva']})", datos['total']])
+            tabla = Table(tablaMontos, colWidths=[anchoRestante * 0.1, None, anchoColumnaMonto])
+            estiloTabla = [
+                ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),                # Fuente negrita para montos
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#1a1a1a")),    # Todo el texto del mismo color
+                ('FONTSIZE', (2, 0), (2, -2), tamTextoNormal),                  # Tamaño de fuente de montos parciales
+                ('FONTSIZE', (1, -1), (2, -1), tamTextoGrande),                 # Tamaño de fuente de fila de total
+                ('ALIGN', (0, 0), (1, -2), 'LEFT'),                             # Alineo cantidades y conceptos a la izquierda
+                ('ALIGN', (1, -1), (1, -1), 'RIGHT'),                           # Alineo la celda de "TOTAL" a la derecha
+                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),                            # Alineo los montos a la derecha
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),                           # Quito padding izquierdo a todo
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),                          # Quito padding derecho a todo
+                ('LEFTPADDING', (1, 0), (1, -1), 12),                           # Agrego padding izquierdo a columna del medio
+                ('RIGHTPADDING', (1, 0), (1, -1), 12),                          # Agrego padding derecho a columna del medio
+                ('TOPPADDING', (0, 1), (-1, -1), 10),                           # Agrego padding superior a todas las filas menos la primera
+                ('LINEBELOW', (0, 0), (-1, -2), 1, colors.lightgrey)            # Agrego línea debajo de cada fila
+            ]
+        else:
+            tablaMontos.append([f"TOTAL ({datos['iva']})", datos['total']])
+            tabla = Table(tablaMontos, colWidths=[None, anchoColumnaMonto])
+            estiloTabla = [
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor("#1a1a1a")),
+                ('FONTSIZE', (1, 0), (1, -2), tamTextoNormal),
+                ('FONTSIZE', (0, -1), (1, -1), tamTextoGrande),
+                ('ALIGN', (0, 0), (0, -2), 'LEFT'),
+                ('ALIGN', (0, -1), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (0, -1), 12),
+                ('TOPPADDING', (0, 1), (-1, -1), 10),
+                ('LINEBELOW', (0, 0), (-1, -2), 1, colors.lightgrey)
+            ]
 
-            # Calculo cuántos puntos debo agregar al último renglón
-            puntos = '.' * (maxCaracteresRenglon - len(ultRenglonConcepto) - maxCaracteresMonto - 4) # Resto 4 por lo mismo de más arriba en "maxCaracteresConcepto"
-
-            tablaMontos.append([renglonesConcepto + puntos, '$' + ((maxCaracteresMonto - len(monto)) - 1) * ' ' + monto])
-
-        # Agrego la fila del total a la lista de filas de montos 
-        tablaMontos = tablaMontos + [[f"TOTAL ({datos['iva']})", datos['total']]]
-
-        # Calculo ancho de columnas de la tabla
-        anchoColumnaMonto = (maxCaracteresMonto + 2) * anchoCaracter # Ancho máximo requerido (en puntos) por la columna "Monto"
-        anchoColumnaDetalle = anchoDisponible - anchoColumnaMonto        
-
-        # Creo la tabla y ajusto sus columnas
-        tabla = Table(tablaMontos, colWidths=[anchoColumnaDetalle, anchoColumnaMonto])
-        tabla.setStyle(TableStyle([ # Las tuplas son (columna, fila)
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'), # Alineo los conceptos de los montos a la izquierda
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'), # Alineo los montos a la derecha
-            ('ALIGN', (0, -1), (0, -1), 'RIGHT'), # Alineo la celda del "TOTAL" a la derecha
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black), # Color del texto
-            ('FONTNAME', (0, 0), (-1, -1), 'Courier'), # Tipo de fuente general
-            ('FONTNAME', (0, -1), (-1, -1), 'Courier-Bold'), # Fuente negrita para el monto total
-            ('FONTSIZE', (0, 0), (-1, -1), tamañoFuenteMontos), # Tamaño de fuente
-            ('LINEABOVE', (-1, -1), (-1, -1), 1, colors.black) # Hago visible la parte superior de la celda inferior derecha
-        ]))
+        # Aplico formato a la tabla
+        tabla.setStyle(TableStyle(estiloTabla))
 
         # Agrego la tabla al documento
         partesPdf.append(tabla)
